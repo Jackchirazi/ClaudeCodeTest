@@ -1,0 +1,138 @@
+{
+  "name": "04 - Lead Gen Chatbot Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-chat",
+      "name": "Webhook: Chat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "chatbot"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route the user's message to determine intent\nconst message = $input.first().json.message?.toLowerCase() || '';\n\nlet intent = 'general_query';\nlet extractedData = {};\n\n// URL qualification\nconst urlMatch = message.match(/(?:qualify|check|analyze|look at|scan)\\s+(?:this\\s+)?(?:url\\s+)?(?:site\\s+)?(https?:\\/\\/[^\\s]+)/i);\nif (urlMatch) {\n  intent = 'qualify_url';\n  extractedData.url = urlMatch[1];\n}\n\n// Direct URL paste\nconst directUrl = message.match(/^(https?:\\/\\/[^\\s]+)$/i);\nif (directUrl) {\n  intent = 'qualify_url';\n  extractedData.url = directUrl[1];\n}\n\n// Lead lookup\nif (message.match(/show|list|find|get.*lead/i)) {\n  intent = 'lead_lookup';\n  const scoreMatch = message.match(/(\\d+)\\+?/);\n  if (scoreMatch) extractedData.min_score = parseInt(scoreMatch[1]);\n}\n\n// Catalog query\nif (message.match(/do we (?:carry|have|stock)|what brands|catalog|brand list/i)) {\n  intent = 'catalog_query';\n  const brandMatch = message.match(/(?:carry|have|stock)\\s+(.+?)\\??$/i);\n  if (brandMatch) extractedData.brand_query = brandMatch[1].trim();\n}\n\n// Add to catalog\nif (message.match(/add .+ to (?:catalog|brands|inventory)/i)) {\n  intent = 'catalog_update';\n}\n\n// Outreach\nif (message.match(/write|draft|generate|create.+(?:email|message|outreach|linkedin|dm)/i)) {\n  intent = 'generate_outreach';\n}\n\n// Stats\nif (message.match(/stats|how many|pipeline|funnel|conversion/i)) {\n  intent = 'pipeline_stats';\n}\n\nreturn [{\n  json: {\n    original_message: $input.first().json.message,\n    intent: intent,\n    extracted_data: extractedData\n  }\n}];"
+      },
+      "id": "intent-router",
+      "name": "Route Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            { "outputKey": "qualify_url", "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "qualify_url", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "outputKey": "lead_lookup", "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "lead_lookup", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "outputKey": "catalog_query", "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "catalog_query", "operator": { "type": "string", "operation": "equals" } }] } },
+            { "outputKey": "general", "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "general_query", "operator": { "type": "string", "operation": "equals" } }] } }
+          ],
+          "fallbackOutput": "general"
+        }
+      },
+      "id": "switch-intent",
+      "name": "Switch by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE }}/webhook/qualify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"url\": \"{{ $json.extracted_data.url }}\" }"
+      },
+      "id": "trigger-qualify",
+      "name": "Trigger Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 100],
+      "notes": "Triggers the main qualification pipeline for the URL"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads?sort%5B0%5D%5Bfield%5D=lead_score&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=20",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {}
+      },
+      "id": "lookup-leads",
+      "name": "Lookup Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 250]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Brands?maxRecords=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {}
+      },
+      "id": "lookup-catalog",
+      "name": "Lookup Catalog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1024,\n  \"system\": \"You are a lead generation assistant for a premium brand distributor. Be concise and action-oriented. Never say 'gray market' or 'diverted' — use 'competitive pricing', 'wholesale', 'allocation'. When answering, use structured formats for lead data.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.original_message }}\"\n    }\n  ]\n}"
+      },
+      "id": "ai-general",
+      "name": "AI General Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 550],
+      "notes": "Handles general queries that don't match a specific intent"
+    }
+  ],
+  "connections": {
+    "Webhook: Chat": {
+      "main": [
+        [{ "node": "Route Intent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Route Intent": {
+      "main": [
+        [{ "node": "Switch by Intent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch by Intent": {
+      "main": [
+        [{ "node": "Trigger Qualification", "type": "main", "index": 0 }],
+        [{ "node": "Lookup Leads", "type": "main", "index": 0 }],
+        [{ "node": "Lookup Catalog", "type": "main", "index": 0 }],
+        [{ "node": "AI General Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "lead-gen" },
+    { "name": "phase-3" }
+  ]
+}

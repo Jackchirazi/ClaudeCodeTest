@@ -1,0 +1,165 @@
+{
+  "name": "05 - Automated Lead Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Discovery (8 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Runs daily at 8 AM. Adjust schedule as needed."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "discover",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-discover",
+      "name": "Webhook: Manual Discover",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 500],
+      "webhookId": "discover"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate search queries based on brand catalog and target verticals\nconst searchQueries = [\n  // Fragrance retailers\n  '\"premium fragrance\" shop online -sephora -ulta -nordstrom -amazon -ebay',\n  '\"luxury perfume\" retailer -sephora -ulta -nordstrom -amazon',\n  '\"niche fragrance\" boutique online store',\n  '\"designer perfume\" discount store online',\n  \n  // Specific brand searches\n  '\"Maison Francis Kurkdjian\" buy online -sephora -nordstrom',\n  '\"Tom Ford\" perfume shop -sephora -ulta -macys',\n  '\"Creed\" fragrance retailer -nordstrom -neiman',\n  '\"Parfums de Marly\" authorized retailer',\n  \n  // Cosmetics retailers\n  '\"luxury cosmetics\" boutique online -sephora -ulta',\n  '\"premium beauty\" retailer independent',\n  '\"Charlotte Tilbury\" \"La Mer\" shop -nordstrom -sephora',\n  \n  // Discount/gray market signals\n  '\"authentic\" \"below retail\" perfume shop',\n  '\"wholesale\" premium fragrance retailer',\n  '\"discount\" luxury perfume online store -amazon'\n];\n\n// If triggered by webhook with a custom query, use that instead\nconst webhookQuery = $('Webhook: Manual Discover')?.first()?.json?.query;\nconst queriesToRun = webhookQuery ? [webhookQuery] : searchQueries;\n\n// Output each query as a separate item for batch processing\nreturn queriesToRun.map(q => ({ json: { query: q } }));"
+      },
+      "id": "generate-queries",
+      "name": "Generate Search Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://serpapi.com/search.json?q={{ encodeURIComponent($json.query) }}&api_key={{ $env.SERPAPI_KEY }}&num=10",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "serpapi-search",
+      "name": "SerpAPI Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [690, 400],
+      "notes": "Searches Google via SerpAPI. Free tier: 100 searches/month."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract retailer URLs from search results and deduplicate\nconst results = $input.all();\nconst excludeDomains = [\n  'amazon.com', 'ebay.com', 'walmart.com', 'sephora.com', 'ulta.com',\n  'nordstrom.com', 'macys.com', 'bloomingdales.com', 'neimanmarcus.com',\n  'target.com', 'cvs.com', 'walgreens.com', 'wikipedia.org',\n  'youtube.com', 'instagram.com', 'facebook.com', 'tiktok.com',\n  'reddit.com', 'twitter.com', 'pinterest.com', 'yelp.com',\n  'fragrantica.com', 'basenotes.com' // Review sites, not retailers\n];\n\nconst urls = new Set();\n\nfor (const result of results) {\n  const organicResults = result.json.organic_results || [];\n  for (const r of organicResults) {\n    try {\n      const domain = new URL(r.link).hostname.replace('www.', '');\n      if (!excludeDomains.some(d => domain.includes(d))) {\n        urls.add(r.link);\n      }\n    } catch (e) {}\n  }\n}\n\nreturn Array.from(urls).map(url => ({ json: { url } }));"
+      },
+      "id": "extract-urls",
+      "name": "Extract & Filter URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads?filterByFormula=website_url%3D%22{{ encodeURIComponent($json.url) }}%22&maxRecords=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {}
+      },
+      "id": "check-duplicate",
+      "name": "Check If Already Qualified",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1130, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.records?.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "is-new",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1350, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE }}/webhook/qualify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"url\": \"{{ $('Extract & Filter URLs').first().json.url }}\" }"
+      },
+      "id": "send-to-qualify",
+      "name": "Send to Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1570, 350],
+      "notes": "Sends new (non-duplicate) URLs to the qualification pipeline"
+    }
+  ],
+  "connections": {
+    "Daily Discovery (8 AM)": {
+      "main": [
+        [{ "node": "Generate Search Queries", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Manual Discover": {
+      "main": [
+        [{ "node": "Generate Search Queries", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Search Queries": {
+      "main": [
+        [{ "node": "SerpAPI Search", "type": "main", "index": 0 }]
+      ]
+    },
+    "SerpAPI Search": {
+      "main": [
+        [{ "node": "Extract & Filter URLs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract & Filter URLs": {
+      "main": [
+        [{ "node": "Check If Already Qualified", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check If Already Qualified": {
+      "main": [
+        [{ "node": "Is New Lead?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is New Lead?": {
+      "main": [
+        [{ "node": "Send to Qualification", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "lead-gen" },
+    { "name": "phase-3" }
+  ]
+}

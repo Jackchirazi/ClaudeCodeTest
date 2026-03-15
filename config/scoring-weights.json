@@ -1,0 +1,67 @@
+{
+  "lead_scoring": {
+    "description": "Weights and thresholds for AI lead scoring (1-10 scale)",
+    "weights": {
+      "likelihood_to_buy_diverted": {
+        "weight": 0.40,
+        "description": "How likely is this retailer to purchase diverted/gray market goods?",
+        "signals": [
+          "Already sells diverted goods (strong positive)",
+          "Independent retailer without strict MAP enforcement (positive)",
+          "Discount-oriented positioning (positive)",
+          "Carries premium brands but at below-MSRP pricing (strong positive)",
+          "Has 'authorized retailer' branding everywhere (negative)",
+          "Part of a large corporate chain with compliance teams (strong negative)"
+        ]
+      },
+      "brand_overlap": {
+        "weight": 0.30,
+        "description": "How many of YOUR brands do they already carry or would logically want?",
+        "signals": [
+          "Carries 5+ of your brands already (strong positive)",
+          "Carries 2-4 of your brands (positive)",
+          "Carries competing brands in same tier (moderate positive)",
+          "Only carries mass-market brands (weak negative)",
+          "Category match but no brand overlap (neutral — potential new customer)"
+        ]
+      },
+      "store_size_and_type": {
+        "weight": 0.20,
+        "description": "Is this the right type and size of retailer?",
+        "signals": [
+          "Mid-tier independent retailer (ideal)",
+          "Online-only with established presence (good)",
+          "Small boutique with physical location (good)",
+          "Large chain store (too risky — compliance issues)",
+          "Pop-up or temporary (too small)",
+          "Multi-location regional chain (good volume potential)"
+        ]
+      },
+      "accessibility": {
+        "weight": 0.10,
+        "description": "How easy is it to reach and do business with this retailer?",
+        "signals": [
+          "Contact info readily available (positive)",
+          "Active on LinkedIn (positive)",
+          "Has a buyer/purchasing role listed (positive)",
+          "No contact info found (negative)",
+          "Located in accessible geography (positive)"
+        ]
+      }
+    },
+    "thresholds": {
+      "auto_qualify": 8,
+      "manual_review": 6,
+      "auto_disqualify": 3,
+      "trigger_contact_discovery": 6,
+      "trigger_outreach_generation": 7
+    },
+    "disqualification_rules": [
+      "Retailer is a major chain (Sephora, Ulta, Nordstrom, Macy's, etc.)",
+      "Retailer is Amazon, eBay, or other major marketplace",
+      "Website is clearly a scam or non-functional",
+      "Retailer only sells products in categories you don't carry",
+      "Retailer is in a restricted/sanctioned geography"
+    ]
+  }
+}

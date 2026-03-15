@@ -1,0 +1,146 @@
+{
+  "name": "02 - Contact Finder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "find-contacts",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-contacts",
+      "name": "Webhook: Find Contacts",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "find-contacts"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract domain from URL for Hunter.io lookup\nconst url = $input.first().json.website_url;\nconst domain = new URL(url).hostname.replace('www.', '');\n\nreturn [{\n  json: {\n    lead_id: $input.first().json.lead_id,\n    retailer_name: $input.first().json.retailer_name,\n    website_url: url,\n    domain: domain\n  }\n}];"
+      },
+      "id": "extract-domain",
+      "name": "Extract Domain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hunter.io/v2/domain-search?domain={{ $json.domain }}&api_key={{ $env.HUNTER_API_KEY }}&limit=10",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "hunter-search",
+      "name": "Hunter.io Domain Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [690, 200],
+      "notes": "Searches Hunter.io for email addresses at the retailer's domain"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter Hunter.io results for relevant job titles\nconst hunterData = $('Hunter.io Domain Search').first().json;\nconst inputData = $('Extract Domain').first().json;\n\nconst targetTitles = [\n  'buyer', 'purchasing', 'merchandis', 'procurement',\n  'owner', 'founder', 'ceo', 'president', 'director',\n  'manager', 'vp', 'vice president', 'head of'\n];\n\nconst emails = (hunterData.data?.emails || []);\n\nconst relevantContacts = emails\n  .filter(email => {\n    if (!email.position) return false;\n    const pos = email.position.toLowerCase();\n    return targetTitles.some(title => pos.includes(title));\n  })\n  .map(email => ({\n    first_name: email.first_name,\n    last_name: email.last_name,\n    email: email.value,\n    title: email.position,\n    confidence: email.confidence,\n    source: 'hunter.io'\n  }));\n\n// If no title-filtered results, take top 3 by confidence\nconst fallbackContacts = emails\n  .sort((a, b) => b.confidence - a.confidence)\n  .slice(0, 3)\n  .map(email => ({\n    first_name: email.first_name,\n    last_name: email.last_name,\n    email: email.value,\n    title: email.position || 'Unknown',\n    confidence: email.confidence,\n    source: 'hunter.io'\n  }));\n\nconst contacts = relevantContacts.length > 0 ? relevantContacts : fallbackContacts;\n\nreturn [{\n  json: {\n    lead_id: inputData.lead_id,\n    retailer_name: inputData.retailer_name,\n    domain: inputData.domain,\n    contacts: contacts,\n    email_pattern: hunterData.data?.pattern || null,\n    total_emails_found: emails.length\n  }\n}];"
+      },
+      "id": "filter-contacts",
+      "name": "Filter Relevant Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"records\": {{ JSON.stringify($json.contacts.map(c => ({\n    fields: {\n      lead_id: $json.lead_id,\n      retailer_name: $json.retailer_name,\n      first_name: c.first_name,\n      last_name: c.last_name,\n      email: c.email,\n      title: c.title,\n      confidence: c.confidence,\n      source: c.source\n    }\n  }))) }}\n}"
+      },
+      "id": "store-contacts",
+      "name": "Store Contacts in Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1130, 200],
+      "notes": "Stores discovered contacts in the Contacts table, linked to the lead"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads/{{ $json.lead_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"fields\": {\n    \"status\": \"contacts_found\",\n    \"contacts_count\": {{ $json.contacts.length }}\n  }\n}"
+      },
+      "id": "update-lead-status",
+      "name": "Update Lead Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1130, 400],
+      "notes": "Updates the lead record to reflect contacts were found"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $('Filter Relevant Contacts').first().json.contacts.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "has-contacts",
+      "name": "Contacts Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Find Contacts": {
+      "main": [
+        [{ "node": "Extract Domain", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Domain": {
+      "main": [
+        [{ "node": "Hunter.io Domain Search", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hunter.io Domain Search": {
+      "main": [
+        [{ "node": "Filter Relevant Contacts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Relevant Contacts": {
+      "main": [
+        [{ "node": "Contacts Found?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Contacts Found?": {
+      "main": [
+        [
+          { "node": "Store Contacts in Airtable", "type": "main", "index": 0 },
+          { "node": "Update Lead Status", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "lead-gen" },
+    { "name": "phase-2" }
+  ]
+}

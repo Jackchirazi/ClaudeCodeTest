@@ -1,0 +1,145 @@
+{
+  "name": "03 - Outreach Message Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-outreach",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-outreach",
+      "name": "Webhook: Generate Outreach",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "generate-outreach"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads/{{ $json.lead_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {}
+      },
+      "id": "fetch-lead",
+      "name": "Fetch Lead Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Contacts?filterByFormula=lead_id%3D%22{{ $('Webhook: Generate Outreach').first().json.lead_id }}%22",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "options": {}
+      },
+      "id": "fetch-contacts",
+      "name": "Fetch Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine lead qualification data with contact info\nconst lead = $('Fetch Lead Data').first().json.fields;\nconst contacts = ($('Fetch Contacts').first().json.records || []).map(r => r.fields);\nconst channel = $('Webhook: Generate Outreach').first().json.channel || 'all';\n\nlet qualification = {};\ntry {\n  qualification = JSON.parse(lead.qualification_json || '{}');\n} catch (e) {\n  qualification = { error: 'Could not parse qualification data' };\n}\n\n// Pick the best contact (highest confidence or first buyer/owner title)\nconst bestContact = contacts.sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0] || {\n  first_name: '[First Name]',\n  last_name: '[Last Name]',\n  title: '[Title]',\n  email: '[email]'\n};\n\nreturn [{\n  json: {\n    lead_id: $('Webhook: Generate Outreach').first().json.lead_id,\n    channel: channel,\n    contact: bestContact,\n    qualification: {\n      retailer_name: lead.retailer_name,\n      lead_score: lead.lead_score,\n      recommendation: lead.recommendation,\n      pitch_angle: qualification.lead_score?.pitch_angle || '',\n      shared_brands: (qualification.brand_overlap?.shared_brands || []).map(b => b.brand),\n      brands_to_pitch: (qualification.brand_overlap?.you_carry_they_dont || []).map(b => b.brand),\n      store_type: qualification.overview?.store_type || '',\n      brand_positioning: qualification.overview?.brand_positioning || ''\n    }\n  }\n}];"
+      },
+      "id": "prepare-prompt-data",
+      "name": "Prepare Prompt Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are a sales copywriter for a premium brand distributor. Generate personalized outreach messages. NEVER use the words 'gray market', 'diverted', or 'diversion'. Use 'competitive pricing', 'wholesale', 'allocation', 'alternative sourcing' instead. Return JSON only.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate outreach messages for this lead.\\n\\nCONTACT:\\n{{ JSON.stringify($json.contact) }}\\n\\nQUALIFICATION:\\n{{ JSON.stringify($json.qualification) }}\\n\\nCHANNEL: {{ $json.channel }}\\n\\nGenerate messages following the outreach prompt templates. Return a JSON array with objects containing: channel, subject (email only), message, talking_points (call only), personalization_notes. Generate all 3 channels (email, linkedin, call_script) if channel is 'all'.\"\n    }\n  ]\n}"
+      },
+      "id": "ai-generate-outreach",
+      "name": "AI Generate Outreach (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and store outreach messages\nconst aiResponse = $input.first().json;\nconst content = aiResponse.content[0].text;\n\nlet messages;\ntry {\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/) || [null, content];\n  messages = JSON.parse(jsonMatch[1].trim());\n  if (!Array.isArray(messages)) messages = [messages];\n} catch (e) {\n  messages = [{ error: 'Failed to parse AI response', raw: content }];\n}\n\nconst leadId = $('Prepare Prompt Data').first().json.lead_id;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    messages: messages,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "parse-outreach",
+      "name": "Parse Outreach Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Outreach",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"records\": {{ JSON.stringify($json.messages.map(m => ({\n    fields: {\n      lead_id: $json.lead_id,\n      channel: m.channel,\n      subject: m.subject || '',\n      message: m.message,\n      talking_points: JSON.stringify(m.talking_points || []),\n      personalization_notes: m.personalization_notes || '',\n      status: 'draft',\n      generated_at: $json.generated_at\n    }\n  }))) }}\n}"
+      },
+      "id": "store-outreach",
+      "name": "Store in Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1350, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Generate Outreach": {
+      "main": [
+        [
+          { "node": "Fetch Lead Data", "type": "main", "index": 0 },
+          { "node": "Fetch Contacts", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Lead Data": {
+      "main": [
+        [{ "node": "Prepare Prompt Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Contacts": {
+      "main": [
+        [{ "node": "Prepare Prompt Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Prompt Data": {
+      "main": [
+        [{ "node": "AI Generate Outreach (Claude)", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Generate Outreach (Claude)": {
+      "main": [
+        [{ "node": "Parse Outreach Messages", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Outreach Messages": {
+      "main": [
+        [{ "node": "Store in Airtable", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "lead-gen" },
+    { "name": "phase-2" }
+  ]
+}
