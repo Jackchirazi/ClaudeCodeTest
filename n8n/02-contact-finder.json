@@ -36,12 +36,11 @@
       "name": "Hunter.io Domain Search",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [690, 200],
-      "notes": "Searches Hunter.io for email addresses at the retailer's domain"
+      "position": [690, 200]
     },
     {
       "parameters": {
-        "jsCode": "// Filter Hunter.io results for relevant job titles\nconst hunterData = $('Hunter.io Domain Search').first().json;\nconst inputData = $('Extract Domain').first().json;\n\nconst targetTitles = [\n  'buyer', 'purchasing', 'merchandis', 'procurement',\n  'owner', 'founder', 'ceo', 'president', 'director',\n  'manager', 'vp', 'vice president', 'head of'\n];\n\nconst emails = (hunterData.data?.emails || []);\n\nconst relevantContacts = emails\n  .filter(email => {\n    if (!email.position) return false;\n    const pos = email.position.toLowerCase();\n    return targetTitles.some(title => pos.includes(title));\n  })\n  .map(email => ({\n    first_name: email.first_name,\n    last_name: email.last_name,\n    email: email.value,\n    title: email.position,\n    confidence: email.confidence,\n    source: 'hunter.io'\n  }));\n\n// If no title-filtered results, take top 3 by confidence\nconst fallbackContacts = emails\n  .sort((a, b) => b.confidence - a.confidence)\n  .slice(0, 3)\n  .map(email => ({\n    first_name: email.first_name,\n    last_name: email.last_name,\n    email: email.value,\n    title: email.position || 'Unknown',\n    confidence: email.confidence,\n    source: 'hunter.io'\n  }));\n\nconst contacts = relevantContacts.length > 0 ? relevantContacts : fallbackContacts;\n\nreturn [{\n  json: {\n    lead_id: inputData.lead_id,\n    retailer_name: inputData.retailer_name,\n    domain: inputData.domain,\n    contacts: contacts,\n    email_pattern: hunterData.data?.pattern || null,\n    total_emails_found: emails.length\n  }\n}];"
+        "jsCode": "// Filter Hunter.io results for buyer/owner/purchasing titles\nconst hunterData = $('Hunter.io Domain Search').first().json;\nconst inputData = $('Extract Domain').first().json;\n\nconst targetTitles = [\n  'buyer', 'purchasing', 'merchandis', 'procurement',\n  'owner', 'founder', 'ceo', 'president', 'director',\n  'manager', 'vp', 'vice president', 'head of'\n];\n\nconst emails = (hunterData.data?.emails || []);\n\nconst relevantContacts = emails\n  .filter(email => {\n    if (!email.position) return false;\n    const pos = email.position.toLowerCase();\n    return targetTitles.some(title => pos.includes(title));\n  })\n  .map(email => ({\n    contact_name: [email.first_name, email.last_name].filter(Boolean).join(' ') || 'Unknown',\n    email: email.value,\n    company: inputData.retailer_name,\n    title: email.position,\n    confidence: email.confidence,\n    source: 'Hunter.io',\n    lead_id: inputData.lead_id\n  }));\n\n// Fallback: top 3 by confidence if no title match\nconst fallbackContacts = emails\n  .sort((a, b) => b.confidence - a.confidence)\n  .slice(0, 3)\n  .map(email => ({\n    contact_name: [email.first_name, email.last_name].filter(Boolean).join(' ') || 'Unknown',\n    email: email.value,\n    company: inputData.retailer_name,\n    title: email.position || 'Unknown',\n    confidence: email.confidence,\n    source: 'Hunter.io',\n    lead_id: inputData.lead_id\n  }));\n\nconst contacts = relevantContacts.length > 0 ? relevantContacts : fallbackContacts;\n\nreturn [{\n  json: {\n    lead_id: inputData.lead_id,\n    retailer_name: inputData.retailer_name,\n    domain: inputData.domain,\n    contacts: contacts,\n    total_emails_found: emails.length\n  }\n}];"
       },
       "id": "filter-contacts",
       "name": "Filter Relevant Contacts",
@@ -51,44 +50,10 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Contacts",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"records\": {{ JSON.stringify($json.contacts.map(c => ({\n    fields: {\n      lead_id: $json.lead_id,\n      retailer_name: $json.retailer_name,\n      first_name: c.first_name,\n      last_name: c.last_name,\n      email: c.email,\n      title: c.title,\n      confidence: c.confidence,\n      source: c.source\n    }\n  }))) }}\n}"
-      },
-      "id": "store-contacts",
-      "name": "Store Contacts in Airtable",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1130, 200],
-      "notes": "Stores discovered contacts in the Contacts table, linked to the lead"
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads/{{ $json.lead_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "airtableTokenApi",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"fields\": {\n    \"status\": \"contacts_found\",\n    \"contacts_count\": {{ $json.contacts.length }}\n  }\n}"
-      },
-      "id": "update-lead-status",
-      "name": "Update Lead Status",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1130, 400],
-      "notes": "Updates the lead record to reflect contacts were found"
-    },
-    {
-      "parameters": {
         "conditions": {
           "conditions": [
             {
-              "leftValue": "={{ $('Filter Relevant Contacts').first().json.contacts.length }}",
+              "leftValue": "={{ $json.contacts.length }}",
               "rightValue": 0,
               "operator": {
                 "type": "number",
@@ -102,7 +67,41 @@
       "name": "Contacts Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1130, 300]
+      "position": [1130, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tblWtuRi6GDX3zUnd",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"records\": {{ JSON.stringify($json.contacts.map(c => ({\n    fields: {\n      \"Contact Name\": c.contact_name,\n      \"Email\": c.email,\n      \"Company\": c.company,\n      \"Title\": c.title,\n      \"Confidence\": c.confidence,\n      \"Source\": c.source,\n      \"Lead ID\": c.lead_id\n    }\n  }))) }}\n}"
+      },
+      "id": "store-contacts",
+      "name": "Store Contacts in Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1350, 100],
+      "notes": "Writes to Contacts table using table ID tblWtuRi6GDX3zUnd"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tbleo1yA6Dy5xC66t/{{ $json.lead_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"fields\": {\n    \"Lead Status\": \"Contacted\",\n    \"Contacts Count\": {{ $json.contacts.length }}\n  }\n}"
+      },
+      "id": "update-lead-status",
+      "name": "Update Lead Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1350, 300],
+      "notes": "Updates Lead Status to Contacted and sets Contacts Count"
     }
   ],
   "connections": {

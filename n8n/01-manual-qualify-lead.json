@@ -33,11 +33,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [470, 200],
-      "notes": "Fetches the homepage HTML. For JS-heavy sites, replace this with a Browserless node."
+      "notes": "Fetches homepage HTML. For JS-heavy Shopify/WooCommerce sites, replace with Browserless node."
     },
     {
       "parameters": {
-        "jsCode": "// Extract useful info from the scraped HTML\nconst html = $input.first().json.data || $input.first().json.body || '';\n\n// Strip HTML tags to get text content\nconst textContent = html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .substring(0, 15000); // Limit to ~15k chars for AI processing\n\n// Try to find navigation links for About and Product pages\nconst aboutPattern = /href=[\"']([^\"']*(?:about|our-story|who-we-are)[^\"']*)[\"']/gi;\nconst productPattern = /href=[\"']([^\"']*(?:product|collection|shop|catalog|brand)[^\"']*)[\"']/gi;\n\nconst aboutLinks = [];\nconst productLinks = [];\nlet match;\n\nwhile ((match = aboutPattern.exec(html)) !== null) {\n  aboutLinks.push(match[1]);\n}\nwhile ((match = productPattern.exec(html)) !== null) {\n  productLinks.push(match[1]);\n}\n\n// Extract brand names (common premium brands)\nconst knownBrands = ['Tom Ford', 'Chanel', 'Dior', 'Gucci', 'Versace', 'YSL', 'Armani',\n  'Creed', 'Maison Francis Kurkdjian', 'MFK', 'Parfums de Marly', 'Initio', 'Byredo',\n  'Le Labo', 'Amouage', 'Kilian', 'Xerjoff', 'La Mer', 'Charlotte Tilbury',\n  'NARS', 'MAC', 'Estee Lauder', 'Burberry', 'Moncler', 'Canada Goose',\n  'Jo Malone', 'Dolce & Gabbana', 'Prada', 'Valentino', 'Givenchy', 'Hermes',\n  'Bvlgari', 'Bottega Veneta', 'Balenciaga', 'Saint Laurent', 'Celine',\n  'Carolina Herrera', 'Montblanc', 'Hugo Boss', 'Calvin Klein', 'Ralph Lauren'];\n\nconst brandsFound = knownBrands.filter(brand => \n  textContent.toLowerCase().includes(brand.toLowerCase())\n);\n\n// Extract prices\nconst pricePattern = /\\$([\\d,]+\\.?\\d{0,2})/g;\nconst prices = [];\nwhile ((match = pricePattern.exec(textContent)) !== null) {\n  prices.push(parseFloat(match[1].replace(',', '')));\n}\n\nreturn [{\n  json: {\n    url: $('Webhook: Qualify URL').first().json.url,\n    text_content: textContent,\n    brands_found: brandsFound,\n    prices_found: prices.slice(0, 50),\n    about_links: [...new Set(aboutLinks)].slice(0, 3),\n    product_links: [...new Set(productLinks)].slice(0, 10),\n    avg_price: prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : null\n  }\n}];"
+        "jsCode": "// Extract useful info from the scraped HTML\nconst html = $input.first().json.data || $input.first().json.body || '';\n\n// Strip HTML tags to get text content\nconst textContent = html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .substring(0, 15000);\n\n// Find navigation links for About and Product pages\nconst aboutPattern = /href=[\"']([^\"']*(?:about|our-story|who-we-are)[^\"']*)[\"']/gi;\nconst productPattern = /href=[\"']([^\"']*(?:product|collection|shop|catalog|brand)[^\"']*)[\"']/gi;\n\nconst aboutLinks = [];\nconst productLinks = [];\nlet match;\n\nwhile ((match = aboutPattern.exec(html)) !== null) {\n  aboutLinks.push(match[1]);\n}\nwhile ((match = productPattern.exec(html)) !== null) {\n  productLinks.push(match[1]);\n}\n\n// Extract known premium brand names\nconst knownBrands = ['Tom Ford', 'Chanel', 'Dior', 'Gucci', 'Versace', 'YSL', 'Armani',\n  'Creed', 'Maison Francis Kurkdjian', 'MFK', 'Parfums de Marly', 'Initio', 'Byredo',\n  'Le Labo', 'Amouage', 'Kilian', 'Xerjoff', 'La Mer', 'Charlotte Tilbury',\n  'NARS', 'MAC', 'Estee Lauder', 'Burberry', 'Moncler', 'Canada Goose',\n  'Jo Malone', 'Dolce & Gabbana', 'Prada', 'Valentino', 'Givenchy', 'Hermes',\n  'Bvlgari', 'Bottega Veneta', 'Balenciaga', 'Saint Laurent', 'Celine',\n  'Carolina Herrera', 'Montblanc', 'Hugo Boss', 'Calvin Klein', 'Ralph Lauren',\n  'Lacoste', 'Polo', 'Coach', 'Kate Spade', 'Michael Kors', 'Tory Burch',\n  'Clinique', 'Lancome', 'Shiseido', 'Kiehl', 'Origins', 'Bobbi Brown'];\n\nconst brandsFound = knownBrands.filter(brand =>\n  textContent.toLowerCase().includes(brand.toLowerCase())\n);\n\n// Extract prices\nconst pricePattern = /\\$([\\d,]+\\.?\\d{0,2})/g;\nconst prices = [];\nwhile ((match = pricePattern.exec(textContent)) !== null) {\n  prices.push(parseFloat(match[1].replace(',', '')));\n}\n\nreturn [{\n  json: {\n    url: $('Webhook: Qualify URL').first().json.url,\n    text_content: textContent,\n    brands_found: brandsFound,\n    prices_found: prices.slice(0, 50),\n    about_links: [...new Set(aboutLinks)].slice(0, 3),\n    product_links: [...new Set(productLinks)].slice(0, 10),\n    avg_price: prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : null\n  }\n}];"
       },
       "id": "extract-data",
       "name": "Extract Page Data",
@@ -47,29 +47,18 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Brands",
+        "method": "GET",
+        "url": "https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tblLJF6qIX783RQRD",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "fields[]",
-              "value": "brand_name"
-            },
-            {
-              "name": "fields[]",
-              "value": "category"
-            },
-            {
-              "name": "fields[]",
-              "value": "your_price"
-            },
-            {
-              "name": "fields[]",
-              "value": "availability_status"
-            }
+            { "name": "fields[]", "value": "Brand Name" },
+            { "name": "fields[]", "value": "Category" },
+            { "name": "fields[]", "value": "Your Price" },
+            { "name": "fields[]", "value": "Status" },
+            { "name": "maxRecords", "value": "300" }
           ]
         },
         "options": {}
@@ -79,11 +68,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [470, 420],
-      "notes": "Fetches your current brand catalog from Airtable for overlap analysis. Replace with your actual Airtable credentials."
+      "notes": "Reads from Brand Catalog table using table ID. Fetches Brand Name, Category, Your Price, Status fields."
     },
     {
       "parameters": {
-        "jsCode": "// Merge scraped data with brand catalog for AI analysis\nconst scrapedData = $('Extract Page Data').first().json;\nconst catalogResponse = $('Fetch Brand Catalog').first().json;\n\nconst catalog = (catalogResponse.records || []).map(r => ({\n  brand: r.fields.brand_name,\n  category: r.fields.category,\n  price: r.fields.your_price,\n  status: r.fields.availability_status\n}));\n\nreturn [{\n  json: {\n    scraped: scrapedData,\n    catalog: catalog\n  }\n}];"
+        "jsCode": "// Merge scraped data with brand catalog for AI analysis\nconst scrapedData = $('Extract Page Data').first().json;\nconst catalogResponse = $('Fetch Brand Catalog').first().json;\n\nconst catalog = (catalogResponse.records || []).map(r => ({\n  brand: r.fields['Brand Name'],\n  category: r.fields['Category'],\n  price: r.fields['Your Price'] || null,\n  status: r.fields['Status'] || 'unknown'\n}));\n\nreturn [{\n  json: {\n    scraped: scrapedData,\n    catalog: catalog\n  }\n}];"
       },
       "id": "merge-data",
       "name": "Merge Scraped + Catalog",
@@ -100,34 +89,24 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "={{ $env.ANTHROPIC_API_KEY }}"
-            },
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            },
-            {
-              "name": "content-type",
-              "value": "application/json"
-            }
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a lead qualification analyst. Analyze this retailer website data and produce a qualification report.\\n\\nRETAILER WEBSITE DATA:\\nURL: {{ $json.scraped.url }}\\nText Content (truncated): {{ $json.scraped.text_content.substring(0, 10000) }}\\nBrands Found: {{ $json.scraped.brands_found.join(', ') }}\\nPrices Found (sample): {{ $json.scraped.prices_found.slice(0, 20).join(', ') }}\\nAverage Price: ${{ $json.scraped.avg_price }}\\n\\nOUR BRAND CATALOG:\\n{{ JSON.stringify($json.catalog) }}\\n\\nProduce a JSON qualification report following the schema in the qualification prompt. Include: retailer overview, products analysis, sourcing behavior assessment, brand overlap analysis, and lead score (1-10). Return ONLY valid JSON.\"\n    }\n  ]\n}"
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a lead qualification analyst for a wholesale distributor (Pickr Wholesale). Analyze this retailer website data and produce a qualification report.\\n\\nRETAILER WEBSITE DATA:\\nURL: {{ $json.scraped.url }}\\nText Content: {{ $json.scraped.text_content.substring(0, 10000) }}\\nBrands Found: {{ $json.scraped.brands_found.join(', ') }}\\nPrices Found (sample): {{ $json.scraped.prices_found.slice(0, 20).join(', ') }}\\nAverage Price: ${{ $json.scraped.avg_price }}\\n\\nOUR BRAND CATALOG ({{ $json.catalog.length }} brands across fragrance, cosmetics, clothing, home, and more):\\n{{ JSON.stringify($json.catalog) }}\\n\\nProduce a JSON qualification report. Include: retailer overview, products analysis, sourcing behavior (would they buy wholesale/diverted goods?), brand overlap analysis, and lead score 1-10 weighted: likelihood to buy wholesale (40%), brand overlap (30%), store size/type (20%), accessibility (10%). Return ONLY valid JSON, no markdown.\"\n    }\n  ]\n}"
       },
       "id": "ai-qualify",
       "name": "AI Qualification (Claude)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1130, 300],
-      "notes": "Calls Claude API for lead qualification. Uses the qualification prompt structure. Replace with n8n AI node if preferred."
+      "position": [1130, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Parse the AI response and prepare for Airtable storage\nconst aiResponse = $input.first().json;\nconst content = aiResponse.content[0].text;\n\n// Parse the JSON from Claude's response\nlet qualification;\ntry {\n  // Handle case where Claude wraps JSON in markdown code blocks\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/) || [null, content];\n  qualification = JSON.parse(jsonMatch[1].trim());\n} catch (e) {\n  qualification = { error: 'Failed to parse AI response', raw: content };\n}\n\nreturn [{\n  json: {\n    url: $('Webhook: Qualify URL').first().json.url,\n    qualification: qualification,\n    lead_score: qualification.lead_score?.total || 0,\n    recommendation: qualification.lead_score?.recommendation || 'unknown',\n    retailer_name: qualification.retailer_name || 'Unknown',\n    analysis_date: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Parse the AI response and prepare for Airtable storage\nconst aiResponse = $input.first().json;\nconst content = aiResponse.content[0].text;\n\nlet qualification;\ntry {\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/) || [null, content];\n  qualification = JSON.parse(jsonMatch[1].trim());\n} catch (e) {\n  qualification = { error: 'Failed to parse AI response', raw: content };\n}\n\nreturn [{\n  json: {\n    url: $('Webhook: Qualify URL').first().json.url,\n    qualification: qualification,\n    lead_score: qualification.lead_score?.total || 0,\n    recommendation: qualification.lead_score?.recommendation || 'unknown',\n    retailer_name: qualification.retailer_name || 'Unknown',\n    analysis_date: new Date().toISOString().split('T')[0]\n  }\n}];"
       },
       "id": "parse-ai-response",
       "name": "Parse AI Response",
@@ -138,19 +117,19 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads",
+        "url": "https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tbleo1yA6Dy5xC66t",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"fields\": {\n    \"retailer_name\": \"{{ $json.retailer_name }}\",\n    \"website_url\": \"{{ $json.url }}\",\n    \"lead_score\": {{ $json.lead_score }},\n    \"recommendation\": \"{{ $json.recommendation }}\",\n    \"qualification_json\": {{ JSON.stringify(JSON.stringify($json.qualification)) }},\n    \"status\": \"qualified\",\n    \"analysis_date\": \"{{ $json.analysis_date }}\"\n  }\n}"
+        "jsonBody": "={\n  \"fields\": {\n    \"Company Name\": \"{{ $json.retailer_name }}\",\n    \"Website\": \"{{ $json.url }}\",\n    \"Lead Score\": {{ $json.lead_score }},\n    \"Recommendation\": \"{{ $json.recommendation }}\",\n    \"Qualification JSON\": {{ JSON.stringify(JSON.stringify($json.qualification)) }},\n    \"Lead Status\": \"Qualified\",\n    \"Analysis Date\": \"{{ $json.analysis_date }}\"\n  }\n}"
       },
       "id": "store-lead",
-      "name": "Store in Airtable",
+      "name": "Store in Airtable (Leads)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1570, 200],
-      "notes": "Stores the qualified lead in Airtable. Creates a new record in the Leads table."
+      "notes": "Creates a new record in the Leads table using your Airtable Base ID and table ID directly."
     },
     {
       "parameters": {
@@ -185,14 +164,14 @@
         "url": "={{ $env.N8N_WEBHOOK_BASE }}/webhook/find-contacts",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": \"{{ $('Store in Airtable').first().json.id }}\",\n  \"retailer_name\": \"{{ $json.retailer_name }}\",\n  \"website_url\": \"{{ $json.url }}\"\n}"
+        "jsonBody": "={\n  \"lead_id\": \"{{ $('Store in Airtable (Leads)').first().json.id }}\",\n  \"retailer_name\": \"{{ $json.retailer_name }}\",\n  \"website_url\": \"{{ $json.url }}\"\n}"
       },
       "id": "trigger-contact-finder",
       "name": "Trigger Contact Finder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1790, 380],
-      "notes": "If score >= 6, triggers the contact discovery workflow"
+      "notes": "Score >= 6: triggers contact discovery workflow"
     },
     {
       "parameters": {
@@ -200,11 +179,11 @@
           "string": [
             {
               "name": "status",
-              "value": "qualified_low_score"
+              "value": "low_score"
             },
             {
               "name": "message",
-              "value": "=Lead scored {{ $json.lead_score }}/10 — below threshold for automatic contact discovery. Review manually if desired."
+              "value": "=Lead scored {{ $json.lead_score }}/10 — below threshold. Stored in Airtable for manual review."
             }
           ]
         }
@@ -253,7 +232,7 @@
     "Parse AI Response": {
       "main": [
         [
-          { "node": "Store in Airtable", "type": "main", "index": 0 },
+          { "node": "Store in Airtable (Leads)", "type": "main", "index": 0 },
           { "node": "Score >= 6?", "type": "main", "index": 0 }
         ]
       ]

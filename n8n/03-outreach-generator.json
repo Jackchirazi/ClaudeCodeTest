@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Leads/{{ $json.lead_id }}",
+        "url": "=https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tbleo1yA6Dy5xC66t/{{ $json.lead_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
         "options": {}
@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Contacts?filterByFormula=lead_id%3D%22{{ $('Webhook: Generate Outreach').first().json.lead_id }}%22",
+        "url": "=https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tblWtuRi6GDX3zUnd?filterByFormula=%7BLead+ID%7D%3D%22{{ $('Webhook: Generate Outreach').first().json.lead_id }}%22",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
         "options": {}
@@ -43,7 +43,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Combine lead qualification data with contact info\nconst lead = $('Fetch Lead Data').first().json.fields;\nconst contacts = ($('Fetch Contacts').first().json.records || []).map(r => r.fields);\nconst channel = $('Webhook: Generate Outreach').first().json.channel || 'all';\n\nlet qualification = {};\ntry {\n  qualification = JSON.parse(lead.qualification_json || '{}');\n} catch (e) {\n  qualification = { error: 'Could not parse qualification data' };\n}\n\n// Pick the best contact (highest confidence or first buyer/owner title)\nconst bestContact = contacts.sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0] || {\n  first_name: '[First Name]',\n  last_name: '[Last Name]',\n  title: '[Title]',\n  email: '[email]'\n};\n\nreturn [{\n  json: {\n    lead_id: $('Webhook: Generate Outreach').first().json.lead_id,\n    channel: channel,\n    contact: bestContact,\n    qualification: {\n      retailer_name: lead.retailer_name,\n      lead_score: lead.lead_score,\n      recommendation: lead.recommendation,\n      pitch_angle: qualification.lead_score?.pitch_angle || '',\n      shared_brands: (qualification.brand_overlap?.shared_brands || []).map(b => b.brand),\n      brands_to_pitch: (qualification.brand_overlap?.you_carry_they_dont || []).map(b => b.brand),\n      store_type: qualification.overview?.store_type || '',\n      brand_positioning: qualification.overview?.brand_positioning || ''\n    }\n  }\n}];"
+        "jsCode": "// Combine lead data with contact info for outreach generation\nconst lead = $('Fetch Lead Data').first().json.fields;\nconst contacts = ($('Fetch Contacts').first().json.records || []).map(r => r.fields);\nconst channel = $('Webhook: Generate Outreach').first().json.channel || 'all';\n\nlet qualification = {};\ntry {\n  qualification = JSON.parse(lead['Qualification JSON'] || '{}');\n} catch (e) {\n  qualification = {};\n}\n\n// Pick best contact by confidence score\nconst bestContact = contacts.sort((a, b) => (b['Confidence'] || 0) - (a['Confidence'] || 0))[0] || {\n  'Contact Name': '[Contact Name]',\n  'Title': '[Title]',\n  'Email': '[email]'\n};\n\nreturn [{\n  json: {\n    lead_id: $('Webhook: Generate Outreach').first().json.lead_id,\n    channel: channel,\n    contact: {\n      name: bestContact['Contact Name'] || '[Contact Name]',\n      first_name: (bestContact['Contact Name'] || '').split(' ')[0] || '[First Name]',\n      title: bestContact['Title'] || '[Title]',\n      email: bestContact['Email'] || '[email]',\n      company: bestContact['Company'] || lead['Company Name']\n    },\n    qualification: {\n      retailer_name: lead['Company Name'],\n      website: lead['Website'],\n      lead_score: lead['Lead Score'],\n      recommendation: lead['Recommendation'],\n      pitch_angle: qualification.lead_score?.pitch_angle || '',\n      shared_brands: (qualification.brand_overlap?.shared_brands || []).map(b => b.brand || b),\n      brands_to_pitch: (qualification.brand_overlap?.you_carry_they_dont || []).map(b => b.brand || b),\n      store_type: qualification.overview?.store_type || '',\n      brand_positioning: qualification.overview?.brand_positioning || ''\n    }\n  }\n}];"
       },
       "id": "prepare-prompt-data",
       "name": "Prepare Prompt Data",
@@ -65,7 +65,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are a sales copywriter for a premium brand distributor. Generate personalized outreach messages. NEVER use the words 'gray market', 'diverted', or 'diversion'. Use 'competitive pricing', 'wholesale', 'allocation', 'alternative sourcing' instead. Return JSON only.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate outreach messages for this lead.\\n\\nCONTACT:\\n{{ JSON.stringify($json.contact) }}\\n\\nQUALIFICATION:\\n{{ JSON.stringify($json.qualification) }}\\n\\nCHANNEL: {{ $json.channel }}\\n\\nGenerate messages following the outreach prompt templates. Return a JSON array with objects containing: channel, subject (email only), message, talking_points (call only), personalization_notes. Generate all 3 channels (email, linkedin, call_script) if channel is 'all'.\"\n    }\n  ]\n}"
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are a sales copywriter for Pickr Wholesale, a premium brand distributor. Generate personalized outreach messages. NEVER use the words 'gray market', 'diverted', or 'diversion'. Use 'competitive pricing', 'wholesale pricing', 'allocation', 'alternative sourcing' instead. Be casual, direct, and brief. Return JSON only — no markdown.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate outreach messages for this lead.\\n\\nCONTACT:\\n{{ JSON.stringify($json.contact) }}\\n\\nLEAD QUALIFICATION:\\n{{ JSON.stringify($json.qualification) }}\\n\\nCHANNEL REQUESTED: {{ $json.channel }}\\n\\nGenerate all 3 variants: email (with subject line, under 100 words), linkedin (under 60 words), call_script (30-second opener + talking points). Return a JSON array where each object has: channel, subject (email only), message, talking_points (call_script only), personalization_notes.\"\n    }\n  ]\n}"
       },
       "id": "ai-generate-outreach",
       "name": "AI Generate Outreach (Claude)",
@@ -75,7 +75,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse AI response and store outreach messages\nconst aiResponse = $input.first().json;\nconst content = aiResponse.content[0].text;\n\nlet messages;\ntry {\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/) || [null, content];\n  messages = JSON.parse(jsonMatch[1].trim());\n  if (!Array.isArray(messages)) messages = [messages];\n} catch (e) {\n  messages = [{ error: 'Failed to parse AI response', raw: content }];\n}\n\nconst leadId = $('Prepare Prompt Data').first().json.lead_id;\n\nreturn [{\n  json: {\n    lead_id: leadId,\n    messages: messages,\n    generated_at: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Parse AI response\nconst aiResponse = $input.first().json;\nconst content = aiResponse.content[0].text;\n\nlet messages;\ntry {\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/) || [null, content];\n  messages = JSON.parse(jsonMatch[1].trim());\n  if (!Array.isArray(messages)) messages = [messages];\n} catch (e) {\n  messages = [{ error: 'Failed to parse AI response', raw: content }];\n}\n\nreturn [{\n  json: {\n    lead_id: $('Prepare Prompt Data').first().json.lead_id,\n    messages: messages,\n    generated_at: new Date().toISOString().split('T')[0]\n  }\n}];"
       },
       "id": "parse-outreach",
       "name": "Parse Outreach Messages",
@@ -86,18 +86,19 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Outreach",
+        "url": "https://api.airtable.com/v0/appy3FO0hIOvxs8mH/tblOr0iMKDEGwtF0s",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "airtableTokenApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"records\": {{ JSON.stringify($json.messages.map(m => ({\n    fields: {\n      lead_id: $json.lead_id,\n      channel: m.channel,\n      subject: m.subject || '',\n      message: m.message,\n      talking_points: JSON.stringify(m.talking_points || []),\n      personalization_notes: m.personalization_notes || '',\n      status: 'draft',\n      generated_at: $json.generated_at\n    }\n  }))) }}\n}"
+        "jsonBody": "={\n  \"records\": {{ JSON.stringify($json.messages.map(m => ({\n    fields: {\n      \"Lead ID\": $json.lead_id,\n      \"Channel\": m.channel,\n      \"Subject\": m.subject || '',\n      \"Message\": m.message || '',\n      \"Talking Points\": JSON.stringify(m.talking_points || []),\n      \"Personalization Notes\": m.personalization_notes || '',\n      \"Outreach Status\": \"Draft\",\n      \"Generated At\": $json.generated_at\n    }\n  }))) }}\n}"
       },
       "id": "store-outreach",
-      "name": "Store in Airtable",
+      "name": "Store in Airtable (Outreach)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1350, 300]
+      "position": [1350, 300],
+      "notes": "Writes to Outreach table using table ID tblOr0iMKDEGwtF0s"
     }
   ],
   "connections": {
@@ -131,7 +132,7 @@
     },
     "Parse Outreach Messages": {
       "main": [
-        [{ "node": "Store in Airtable", "type": "main", "index": 0 }]
+        [{ "node": "Store in Airtable (Outreach)", "type": "main", "index": 0 }]
       ]
     }
   },
