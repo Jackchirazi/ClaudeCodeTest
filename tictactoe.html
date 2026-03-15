@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      letter-spacing: 2px;
+      color: #e94560;
+    }
+
+    #status {
+      font-size: 1.2rem;
+      margin-bottom: 1.5rem;
+      min-height: 1.5rem;
+      color: #a8dadc;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 8px;
+    }
+
+    .cell {
+      background: #16213e;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.5rem;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .cell:hover:not(.taken) {
+      background: #0f3460;
+      transform: scale(1.05);
+    }
+
+    .cell.x { color: #e94560; }
+    .cell.o { color: #a8dadc; }
+
+    .cell.win {
+      background: #0f3460;
+      animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
+    #controls {
+      margin-top: 1.8rem;
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      padding: 0.6rem 1.6rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.85; }
+
+    #restart {
+      background: #e94560;
+      color: #fff;
+    }
+
+    #mode-btn {
+      background: #0f3460;
+      color: #a8dadc;
+      border: 1px solid #a8dadc;
+    }
+
+    #score {
+      margin-top: 1.2rem;
+      display: flex;
+      gap: 2rem;
+      font-size: 1rem;
+      color: #888;
+    }
+
+    #score span { font-weight: bold; color: #eee; }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe</h1>
+  <div id="status">X's turn</div>
+  <div id="board"></div>
+  <div id="controls">
+    <button id="restart">Restart</button>
+    <button id="mode-btn">vs CPU</button>
+  </div>
+  <div id="score">
+    X wins: <span id="x-wins">0</span>
+    &nbsp;|&nbsp;
+    Draws: <span id="draws">0</span>
+    &nbsp;|&nbsp;
+    O wins: <span id="o-wins">0</span>
+  </div>
+
+  <script>
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const restartBtn = document.getElementById('restart');
+    const modeBtn = document.getElementById('mode-btn');
+    const xWinsEl = document.getElementById('x-wins');
+    const drawsEl = document.getElementById('draws');
+    const oWinsEl = document.getElementById('o-wins');
+
+    const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+    let board, current, gameOver, vsCPU, score;
+
+    function init() {
+      board = Array(9).fill(null);
+      current = 'X';
+      gameOver = false;
+      render();
+      updateStatus();
+      if (vsCPU && current === 'O') setTimeout(cpuMove, 400);
+    }
+
+    function setup() {
+      vsCPU = false;
+      score = { X: 0, draw: 0, O: 0 };
+      updateScoreDisplay();
+      init();
+    }
+
+    function render() {
+      boardEl.innerHTML = '';
+      board.forEach((val, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell' + (val ? ` ${val.toLowerCase()} taken` : '');
+        cell.textContent = val || '';
+        cell.addEventListener('click', () => handleClick(i));
+        boardEl.appendChild(cell);
+      });
+    }
+
+    function highlight(indices) {
+      const cells = boardEl.querySelectorAll('.cell');
+      indices.forEach(i => cells[i].classList.add('win'));
+    }
+
+    function handleClick(i) {
+      if (gameOver || board[i]) return;
+      if (vsCPU && current === 'O') return;
+      play(i);
+      if (!gameOver && vsCPU && current === 'O') setTimeout(cpuMove, 400);
+    }
+
+    function play(i) {
+      board[i] = current;
+      render();
+      const result = checkWin();
+      if (result) {
+        highlight(result);
+        statusEl.textContent = `${current} wins!`;
+        score[current]++;
+        updateScoreDisplay();
+        gameOver = true;
+      } else if (board.every(Boolean)) {
+        statusEl.textContent = "It's a draw!";
+        score.draw++;
+        updateScoreDisplay();
+        gameOver = true;
+      } else {
+        current = current === 'X' ? 'O' : 'X';
+        updateStatus();
+      }
+    }
+
+    function checkWin() {
+      for (const line of WINS) {
+        if (line.every(i => board[i] === current)) return line;
+      }
+      return null;
+    }
+
+    function updateStatus() {
+      const label = vsCPU
+        ? (current === 'X' ? 'Your turn (X)' : 'CPU thinking...')
+        : `${current}'s turn`;
+      statusEl.textContent = label;
+    }
+
+    function updateScoreDisplay() {
+      xWinsEl.textContent = score.X;
+      drawsEl.textContent = score.draw;
+      oWinsEl.textContent = score.O;
+    }
+
+    // Minimax AI
+    function cpuMove() {
+      if (gameOver) return;
+      const move = bestMove();
+      play(move);
+    }
+
+    function bestMove() {
+      let best = -Infinity, idx = -1;
+      board.forEach((v, i) => {
+        if (!v) {
+          board[i] = 'O';
+          const score = minimax(board, 0, false);
+          board[i] = null;
+          if (score > best) { best = score; idx = i; }
+        }
+      });
+      return idx;
+    }
+
+    function minimax(b, depth, isMax) {
+      const winner = getWinner(b);
+      if (winner === 'O') return 10 - depth;
+      if (winner === 'X') return depth - 10;
+      if (b.every(Boolean)) return 0;
+
+      if (isMax) {
+        let best = -Infinity;
+        b.forEach((v, i) => {
+          if (!v) { b[i] = 'O'; best = Math.max(best, minimax(b, depth+1, false)); b[i] = null; }
+        });
+        return best;
+      } else {
+        let best = Infinity;
+        b.forEach((v, i) => {
+          if (!v) { b[i] = 'X'; best = Math.min(best, minimax(b, depth+1, true)); b[i] = null; }
+        });
+        return best;
+      }
+    }
+
+    function getWinner(b) {
+      for (const line of WINS) {
+        const [a, c, d] = line;
+        if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a];
+      }
+      return null;
+    }
+
+    restartBtn.addEventListener('click', init);
+
+    modeBtn.addEventListener('click', () => {
+      vsCPU = !vsCPU;
+      modeBtn.textContent = vsCPU ? 'vs Human' : 'vs CPU';
+      score = { X: 0, draw: 0, O: 0 };
+      updateScoreDisplay();
+      init();
+    });
+
+    setup();
+  </script>
+</body>
+</html>
