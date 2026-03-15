@@ -14,15 +14,20 @@ cmd.exe /c start "" "C:\Users\COCK\ClaudeCodeTest\tictactoe.html"
 
 ## Git Workflow
 
-After every meaningful change: commit locally with a clean message, then push to GitHub.
+**This is a hard rule:** after every meaningful piece of work — new feature, bug fix, refactor, or any notable change — Claude must commit and push to GitHub immediately. Never leave work uncommitted. This ensures we always have a clean history to revert to.
 
 ```bash
 git add <file>
-git commit -m "descriptive message"
+git commit -m "short imperative summary
+
+Optional body explaining why, not what."
 git push
 ```
 
-Remote: https://github.com/Jackchirazi/ClaudeCodeTest (branch: `master`)
+- Remote: https://github.com/Jackchirazi/ClaudeCodeTest (branch: `master`)
+- Commit messages must be specific and descriptive — not generic like "update file"
+- Push after every commit — local-only commits are not acceptable
+- If multiple logical changes were made in one session, split them into separate commits
 
 ## Project Structure
 
