@@ -26,7 +26,8 @@
       "name": "Fetch Lead Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [470, 200]
+      "position": [470, 200],
+      "notes": "Uses your saved Airtable Lead Gen credential."
     },
     {
       "parameters": {
@@ -39,7 +40,8 @@
       "name": "Fetch Contacts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [470, 420]
+      "position": [470, 420],
+      "notes": "Uses your saved Airtable Lead Gen credential."
     },
     {
       "parameters": {
@@ -58,20 +60,30 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "x-api-key",
+              "value": "PASTE_YOUR_ANTHROPIC_KEY_HERE"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are a sales copywriter for Pickr Wholesale, a premium brand distributor. Generate personalized outreach messages. NEVER use the words 'gray market', 'diverted', or 'diversion'. Use 'competitive pricing', 'wholesale pricing', 'allocation', 'alternative sourcing' instead. Be casual, direct, and brief. Return JSON only — no markdown.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate outreach messages for this lead.\\n\\nCONTACT:\\n{{ JSON.stringify($json.contact) }}\\n\\nLEAD QUALIFICATION:\\n{{ JSON.stringify($json.qualification) }}\\n\\nCHANNEL REQUESTED: {{ $json.channel }}\\n\\nGenerate all 3 variants: email (with subject line, under 100 words), linkedin (under 60 words), call_script (30-second opener + talking points). Return a JSON array where each object has: channel, subject (email only), message, talking_points (call_script only), personalization_notes.\"\n    }\n  ]\n}"
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are a sales copywriter for Pickr Wholesale, a premium brand distributor. Generate personalized outreach messages. NEVER use the words 'gray market', 'diverted', or 'diversion'. Use 'competitive pricing', 'wholesale pricing', 'allocation', 'alternative sourcing' instead. Be casual, direct, and brief. Return JSON only — no markdown.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate outreach messages for this lead.\\n\\nCONTACT:\\n{{ JSON.stringify($json.contact) }}\\n\\nLEAD QUALIFICATION:\\n{{ JSON.stringify($json.qualification) }}\\n\\nCHANNEL REQUESTED: {{ $json.channel }}\\n\\nGenerate all 3 variants: email (with subject line, under 100 words), linkedin (under 60 words), call_script (30-second opener + talking points). Return a JSON array where each object has: channel, subject (email only), message, talking_points (call_script only), personalization_notes.\"\n    }\n  ]\n}"
       },
       "id": "ai-generate-outreach",
       "name": "AI Generate Outreach (Claude)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [910, 300]
+      "position": [910, 300],
+      "notes": "⚠️ BEFORE USING: Click this node and replace PASTE_YOUR_ANTHROPIC_KEY_HERE with your actual Anthropic API key (starts with sk-ant-)"
     },
     {
       "parameters": {
@@ -98,7 +110,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1350, 300],
-      "notes": "Writes to Outreach table using table ID tblOr0iMKDEGwtF0s"
+      "notes": "Uses your saved Airtable Lead Gen credential. Writes to Outreach table."
     }
   ],
   "connections": {

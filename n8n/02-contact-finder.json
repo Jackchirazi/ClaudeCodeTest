@@ -27,7 +27,7 @@
     },
     {
       "parameters": {
-        "url": "=https://api.hunter.io/v2/domain-search?domain={{ $json.domain }}&api_key={{ $env.HUNTER_API_KEY }}&limit=10",
+        "url": "=https://api.hunter.io/v2/domain-search?domain={{ $json.domain }}&api_key=PASTE_YOUR_HUNTER_KEY_HERE&limit=10",
         "options": {
           "timeout": 15000
         }
@@ -36,7 +36,8 @@
       "name": "Hunter.io Domain Search",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [690, 200]
+      "position": [690, 200],
+      "notes": "⚠️ BEFORE USING: Click this node and replace PASTE_YOUR_HUNTER_KEY_HERE in the URL with your actual Hunter.io API key"
     },
     {
       "parameters": {
@@ -84,7 +85,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1350, 100],
-      "notes": "Writes to Contacts table using table ID tblWtuRi6GDX3zUnd"
+      "notes": "Uses your saved Airtable Lead Gen credential. Writes to Contacts table."
     },
     {
       "parameters": {
@@ -101,7 +102,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1350, 300],
-      "notes": "Updates Lead Status to Contacted and sets Contacts Count"
+      "notes": "Updates Lead Status to Contacted and sets Contacts Count in Leads table."
     }
   ],
   "connections": {

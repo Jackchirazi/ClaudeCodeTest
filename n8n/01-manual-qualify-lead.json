@@ -37,7 +37,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extract useful info from the scraped HTML\nconst html = $input.first().json.data || $input.first().json.body || '';\n\n// Strip HTML tags to get text content\nconst textContent = html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .substring(0, 15000);\n\n// Find navigation links for About and Product pages\nconst aboutPattern = /href=[\"']([^\"']*(?:about|our-story|who-we-are)[^\"']*)[\"']/gi;\nconst productPattern = /href=[\"']([^\"']*(?:product|collection|shop|catalog|brand)[^\"']*)[\"']/gi;\n\nconst aboutLinks = [];\nconst productLinks = [];\nlet match;\n\nwhile ((match = aboutPattern.exec(html)) !== null) {\n  aboutLinks.push(match[1]);\n}\nwhile ((match = productPattern.exec(html)) !== null) {\n  productLinks.push(match[1]);\n}\n\n// Extract known premium brand names\nconst knownBrands = ['Tom Ford', 'Chanel', 'Dior', 'Gucci', 'Versace', 'YSL', 'Armani',\n  'Creed', 'Maison Francis Kurkdjian', 'MFK', 'Parfums de Marly', 'Initio', 'Byredo',\n  'Le Labo', 'Amouage', 'Kilian', 'Xerjoff', 'La Mer', 'Charlotte Tilbury',\n  'NARS', 'MAC', 'Estee Lauder', 'Burberry', 'Moncler', 'Canada Goose',\n  'Jo Malone', 'Dolce & Gabbana', 'Prada', 'Valentino', 'Givenchy', 'Hermes',\n  'Bvlgari', 'Bottega Veneta', 'Balenciaga', 'Saint Laurent', 'Celine',\n  'Carolina Herrera', 'Montblanc', 'Hugo Boss', 'Calvin Klein', 'Ralph Lauren',\n  'Lacoste', 'Polo', 'Coach', 'Kate Spade', 'Michael Kors', 'Tory Burch',\n  'Clinique', 'Lancome', 'Shiseido', 'Kiehl', 'Origins', 'Bobbi Brown'];\n\nconst brandsFound = knownBrands.filter(brand =>\n  textContent.toLowerCase().includes(brand.toLowerCase())\n);\n\n// Extract prices\nconst pricePattern = /\\$([\\d,]+\\.?\\d{0,2})/g;\nconst prices = [];\nwhile ((match = pricePattern.exec(textContent)) !== null) {\n  prices.push(parseFloat(match[1].replace(',', '')));\n}\n\nreturn [{\n  json: {\n    url: $('Webhook: Qualify URL').first().json.url,\n    text_content: textContent,\n    brands_found: brandsFound,\n    prices_found: prices.slice(0, 50),\n    about_links: [...new Set(aboutLinks)].slice(0, 3),\n    product_links: [...new Set(productLinks)].slice(0, 10),\n    avg_price: prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : null\n  }\n}];"
+        "jsCode": "// Extract useful info from the scraped HTML\nconst html = $input.first().json.data || $input.first().json.body || '';\n\n// Strip HTML tags to get text content\nconst textContent = html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .substring(0, 15000);\n\n// Find navigation links for About and Product pages\nconst aboutPattern = /href=[\"']([^\"']*(?:about|our-story|who-we-are)[^\"']*)[\"']/gi;\nconst productPattern = /href=[\"']([^\"']*(?:product|collection|shop|catalog|brand)[^\"']*)[\"']/gi;\n\nconst aboutLinks = [];\nconst productLinks = [];\nlet match;\n\nwhile ((match = aboutPattern.exec(html)) !== null) {\n  aboutLinks.push(match[1]);\n}\nwhile ((match = productPattern.exec(html)) !== null) {\n  productLinks.push(match[1]);\n}\n\n// Extract known premium brand names\nconst knownBrands = ['Tom Ford', 'Chanel', 'Dior', 'Gucci', 'Versace', 'YSL', 'Armani',\n  'Creed', 'Maison Francis Kurkdjian', 'MFK', 'Parfums de Marly', 'Initio', 'Byredo',\n  'Le Labo', 'Amouage', 'Kilian', 'Xerjoff', 'La Mer', 'Charlotte Tilbury',\n  'NARS', 'MAC', 'Estee Lauder', 'Burberry', 'Moncler', 'Canada Goose',\n  'Jo Malone', 'Dolce & Gabbana', 'Prada', 'Valentino', 'Givenchy', 'Hermes',\n  'Bvlgari', 'Bottega Veneta', 'Balenciaga', 'Saint Laurent', 'Celine',\n  'Carolina Herrera', 'Montblanc', 'Hugo Boss', 'Calvin Klein', 'Ralph Lauren',\n  'Lacoste', 'Coach', 'Kate Spade', 'Michael Kors', 'Tory Burch',\n  'Clinique', 'Lancome', 'Shiseido', 'Kiehl', 'Origins', 'Bobbi Brown'];\n\nconst brandsFound = knownBrands.filter(brand =>\n  textContent.toLowerCase().includes(brand.toLowerCase())\n);\n\n// Extract prices\nconst pricePattern = /\\$([\\d,]+\\.?\\d{0,2})/g;\nconst prices = [];\nwhile ((match = pricePattern.exec(textContent)) !== null) {\n  prices.push(parseFloat(match[1].replace(',', '')));\n}\n\nreturn [{\n  json: {\n    url: $('Webhook: Qualify URL').first().json.url,\n    text_content: textContent,\n    brands_found: brandsFound,\n    prices_found: prices.slice(0, 50),\n    about_links: [...new Set(aboutLinks)].slice(0, 3),\n    product_links: [...new Set(productLinks)].slice(0, 10),\n    avg_price: prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : null\n  }\n}];"
       },
       "id": "extract-data",
       "name": "Extract Page Data",
@@ -68,7 +68,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [470, 420],
-      "notes": "Reads from Brand Catalog table using table ID. Fetches Brand Name, Category, Your Price, Status fields."
+      "notes": "Uses your saved Airtable Lead Gen credential. Reads Brand Catalog table."
     },
     {
       "parameters": {
@@ -84,25 +84,33 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "x-api-key",
+              "value": "PASTE_YOUR_ANTHROPIC_KEY_HERE"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a lead qualification analyst for a wholesale distributor (Pickr Wholesale). Analyze this retailer website data and produce a qualification report.\\n\\nRETAILER WEBSITE DATA:\\nURL: {{ $json.scraped.url }}\\nText Content: {{ $json.scraped.text_content.substring(0, 10000) }}\\nBrands Found: {{ $json.scraped.brands_found.join(', ') }}\\nPrices Found (sample): {{ $json.scraped.prices_found.slice(0, 20).join(', ') }}\\nAverage Price: ${{ $json.scraped.avg_price }}\\n\\nOUR BRAND CATALOG ({{ $json.catalog.length }} brands across fragrance, cosmetics, clothing, home, and more):\\n{{ JSON.stringify($json.catalog) }}\\n\\nProduce a JSON qualification report. Include: retailer overview, products analysis, sourcing behavior (would they buy wholesale/diverted goods?), brand overlap analysis, and lead score 1-10 weighted: likelihood to buy wholesale (40%), brand overlap (30%), store size/type (20%), accessibility (10%). Return ONLY valid JSON, no markdown.\"\n    }\n  ]\n}"
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a lead qualification analyst for Pickr Wholesale, a wholesale distributor. Analyze this retailer website and produce a qualification report.\\n\\nRETAILER WEBSITE DATA:\\nURL: {{ $json.scraped.url }}\\nText Content: {{ $json.scraped.text_content.substring(0, 10000) }}\\nBrands Found: {{ $json.scraped.brands_found.join(', ') }}\\nPrices Found (sample): {{ $json.scraped.prices_found.slice(0, 20).join(', ') }}\\nAverage Price: ${{ $json.scraped.avg_price }}\\n\\nPICKR WHOLESALE BRAND CATALOG ({{ $json.catalog.length }} brands across fragrance, cosmetics, clothing, home, outdoor and more):\\n{{ JSON.stringify($json.catalog) }}\\n\\nProduce a JSON qualification report with these sections:\\n1. retailer_name: string\\n2. overview: {store_type, website_quality, physical_locations, target_customer, brand_positioning}\\n3. products: {categories, premium_brands_found, price_positioning, estimated_sku_count}\\n4. sourcing_behavior: {likelihood_to_buy_diverted (very_likely/likely/uncertain/unlikely/very_unlikely), reasoning, risk_tolerance}\\n5. brand_overlap: {shared_brands (array), you_carry_they_dont (array with pitch_reason), category_gaps}\\n6. lead_score: {total (1-10), breakdown: {likelihood_to_buy_diverted (40%), brand_overlap (30%), store_size_type (20%), accessibility (10%)}, recommendation (hot_lead/worth_pursuing/maybe_later/skip), pitch_angle, red_flags}\\n\\nReturn ONLY valid JSON. No markdown.\"\n    }\n  ]\n}"
       },
       "id": "ai-qualify",
       "name": "AI Qualification (Claude)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1130, 300]
+      "position": [1130, 300],
+      "notes": "⚠️ BEFORE USING: Click this node and replace PASTE_YOUR_ANTHROPIC_KEY_HERE with your actual Anthropic API key (starts with sk-ant-)"
     },
     {
       "parameters": {
@@ -129,7 +137,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1570, 200],
-      "notes": "Creates a new record in the Leads table using your Airtable Base ID and table ID directly."
+      "notes": "Uses your saved Airtable Lead Gen credential. Creates new record in Leads table."
     },
     {
       "parameters": {
@@ -161,7 +169,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.N8N_WEBHOOK_BASE }}/webhook/find-contacts",
+        "url": "https://jackrookie.app.n8n.cloud/webhook/find-contacts",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"lead_id\": \"{{ $('Store in Airtable (Leads)').first().json.id }}\",\n  \"retailer_name\": \"{{ $json.retailer_name }}\",\n  \"website_url\": \"{{ $json.url }}\"\n}"
