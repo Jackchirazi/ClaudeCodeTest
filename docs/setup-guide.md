@@ -1,3 +1,4 @@
+
 # Lead Gen System — Setup Guide
 
 Step-by-step instructions to get the full system running. Follow phases in order. Phase 1 gets you a working manual qualification pipeline; later phases add automation.
